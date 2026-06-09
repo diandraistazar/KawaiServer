@@ -2,6 +2,7 @@
 
 #include <netdb.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 #include <string.h>
 #include <stdio.h>
 #include "macros.h"
@@ -118,7 +119,7 @@ int addrsock_str(int type, int data, char *buffer, size_t buffer_size) {
 
 	// Handle _ADDR
 	else if(type & _ADDR) {
-		struct in_addr addr = { .s_addr = data };
+		struct in_addr addr = { .s_addr = (in_addr_t) data };
 		
 		if(inet_ntop(AF_INET, &addr, temp, sizeof(temp)) != temp)
 			return 1;
@@ -136,22 +137,4 @@ int addrsock_str(int type, int data, char *buffer, size_t buffer_size) {
 		
 	strncpy(buffer, temp, buffer_size);
 	return 0;
-}
-
-int send_data(int clientfd, void *data, size_t size, int flags) {
-	int bytes = 0, bytes_before = 0;
-
-	while(bytes < size) {
-		if(bytes == -1)
-			return -1;
-
-		bytes = send(clientfd, data, size, flags);
-
-		if(bytes == 0)
-			break;
-		
-		bytes_before = bytes;
-	}
-
-	return bytes_before;
 }
