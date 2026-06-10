@@ -4,7 +4,7 @@ INC := -I../library
 LIBS := -lmagic
 
 SRC := ./src/
-OBJ := main.o webserver.o http.o utils.o
+OBJ := main.o logging.o webserver.o http.o utils.o
 OUT := kawaiserver.out
 
 $(OUT): $(OBJ)

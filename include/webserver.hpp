@@ -5,8 +5,8 @@
 
 struct Client {
 	struct sockaddr_in in_sock;
-	char ip_addr[16], port[16];
-	char hostname[128], service[128];
+	char ip_addr[16] = {0}, port[16] = {0};
+	char hostname[128] = {0}, service[16] = {0};
 	int fd;
 	
 	~Client();
@@ -15,13 +15,12 @@ struct Client {
 
 struct Server {
 	struct addrinfo addr;
-	char ip_addr[16], port[16];
+	char ip_addr[16] = {0}, port[16] = {0};
 	int fd;
 	
 	~Server();
 	void close();
-	int get_addr(char *host, char *service, int flags, int family, int socktype, int protocol);
-	int create_sock();
+	int create_sock(char *host, char *service, int flags, int family, int socktype, int protocol);
 	int set_sockopt(int opt, int values, void *data, size_t data_size);
 	int bind_sock();
 	int listen_sock(int backlog);
