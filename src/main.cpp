@@ -1,48 +1,61 @@
 #include "../include/logging.hpp"
 #include "../include/webserver.hpp"
+#include "../include/utils.hpp"
 
 Logging logging;
+Server server;
 
 int main(int argc, char *argv[]) {
-	if(argc < 3) {
-		std::printf("usage: %s host service\n", argv[0]);
+	double start, end;
+
+	start = Utils::get_time();
+
+	if(argc < 4) {
+		std::printf("usage: %s host service root\n", argv[0]);
 		return 1;
 	}
 
-	logging.info("setup server is starting...");
+	logging.info("server setup is running...");
 
-	Server server;
-	if(server.create_sock(argv[1], argv[2], 0, AF_INET, SOCK_STREAM, 0) == -1) {
-		logging.error("server.create_sock() returns -1");
+	server.root_path = argv[3]; // Set the root path
+	
+	if(server.initialize() < 0) {
+		logging.error("server.initialize() returns non-zero");
+		return 1;
+	}
+
+	if(server.create_sockets(argv[1], argv[2]) < 0) {
+		logging.error("server.create_socket() returns non-zero");
 		return 1;
 	}
 	
 	logging.info("server socket created successfully");
 
-	int yes = 1;
-	if(server.set_sockopt(SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1) {
-		logging.error("server.set_sockopt() returns -1");
+	if(server.set_socket_options() < 0) {
+		logging.error("server.set_socket_option() returns non-zero");
 		return 1;
 	}
 	
 	logging.info("socket options set successfully");
 	
-	if(server.bind_sock() == -1) {
-		logging.error("server.bind_sock() returns -1");
+	if(server.bind_sockets() < 0) {
+		logging.error("server.bind_socket() returns non-zero");
 		return 1;
 	}
 	
 	logging.info("socket bounded to %s:%s successfully", server.ip_addr, server.port);
 
-	if(server.listen_sock(1) == -1) {
-		logging.error("server.listen_sock() returns -1");
+	if(server.listen_sockets() < 0) {
+		logging.error("server.listen_socket() returns non-zero");
 		return 1;
 	}
 
 	logging.info("socket now is listening connections");
-	logging.info("server opened HTTP service");
 
-	server.start();
+	server.run();
 	logging.info("server terminated");
+	
+	end = Utils::get_time();
+	logging.info("program was running for about %.2f seconds", end - start);
 	return 0;
 }

@@ -24,10 +24,10 @@ int Http::create_http_header_str(struct Http::msg &http, std::string &dest) {
 	else
 		return -1;
 
-	for(int index = 0; index < http.headers.size(); index++) {
-		dest.append(http.headers[index].key);
+	for(const struct Http::Header &header : http.headers) {
+		dest.append(header.key);
 		dest.append(": ");
-		dest.append(http.headers[index].value);
+		dest.append(header.value);
 		dest.append("\r\n");
 	}
 

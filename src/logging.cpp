@@ -20,7 +20,7 @@ void Logging::log(int level, const char *filename, int line, const char *format,
 	
 	seconds = time(nullptr);
 	tm_time = localtime(&seconds);
-	time_size = strftime(time_buffer, sizeof(time_buffer), "%m-%d-%y %I:%M:%S %p", tm_time);
+	time_size = strftime(time_buffer, sizeof(time_buffer), "%b %d %H:%M:%S", tm_time);
 
 	std::fwrite(time_buffer, 1, time_size, stream); // Print the timestamp first
 	std::fprintf(stream, " [%s] ", level_strings[level]); // Then, print the level label, e.g TRACE, ERROR

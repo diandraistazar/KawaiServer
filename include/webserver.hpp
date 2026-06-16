@@ -1,36 +1,47 @@
 #pragma once
 
 #include <netdb.h>
+#include <sys/un.h>
 #include "http.hpp"
 
+#define LOCAL_PATH "/tmp/kawaiserver-php-local"
+#define LOCAL_PATH_LEN sizeof(LOCAL_PATH)
+
 struct Client {
-	struct sockaddr_in in_sock;
+	struct sockaddr_in client_sock;
 	char ip_addr[16] = {0}, port[16] = {0};
 	char hostname[128] = {0}, service[16] = {0};
-	int fd;
+	int client_fd;
 	
 	~Client();
 	void close();
 };
 
 struct Server {
-	struct addrinfo addr;
+	struct sockaddr_in server_sock;
+	struct sockaddr_un php_sock;
+	char *root_path = nullptr;
 	char ip_addr[16] = {0}, port[16] = {0};
-	int fd;
+	int server_fd, php_fd;
+	bool is_continue = true;
 	
 	~Server();
 	void close();
-	int create_sock(char *host, char *service, int flags, int family, int socktype, int protocol);
-	int set_sockopt(int opt, int values, void *data, size_t data_size);
-	int bind_sock();
-	int listen_sock(int backlog);
-	void start();
+	int initialize();
+	void run();
+	int create_sockets(char *host, char *service);
+	int set_socket_options();
+	int bind_sockets();
+	int listen_sockets();
 	
 private:
-	size_t receive_data(struct Client &client, std::string &dest);
-	size_t send_data(struct Client &client, std::string &source);
+	static void terminate(int signal);
+	
+	size_t recv_data(int fd, std::string &dest);
+	size_t send_data(int fd, std::string &buffer);
+	size_t send_file(int fd, std::string &filepath);
 	void handling_client(struct Client &client);
 	int accept_client(class Client &client);
 
-	void handle_get(std::string &dest, struct Http::request_msg &request);
+	void handle_get(struct Http::request_msg &_request, struct Client &client);
 };
