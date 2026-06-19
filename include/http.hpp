@@ -2,9 +2,15 @@
 
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 namespace Http {
 	enum { HTTP_REQUEST, HTTP_RESPONSE };
+
+	static std::unordered_map<int, std::string> status_messages = {
+		{ 200, "OK" },
+		{ 404, "Not Found" }
+	};
 
 	struct Header {
 		std::string key, value;

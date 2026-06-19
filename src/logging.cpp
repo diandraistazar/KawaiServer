@@ -11,6 +11,9 @@ void Logging::log(int level, const char *filename, int line, const char *format,
 	time_t seconds = 0;
 	va_list list;
 	
+	if(level < this->level)
+		return;
+
 	if(level <= LOG_WARN)
 		stream = stdout;
 	else
@@ -21,11 +24,12 @@ void Logging::log(int level, const char *filename, int line, const char *format,
 	seconds = time(nullptr);
 	tm_time = localtime(&seconds);
 	time_size = strftime(time_buffer, sizeof(time_buffer), "%b %d %H:%M:%S", tm_time);
-
-	std::fwrite(time_buffer, 1, time_size, stream); // Print the timestamp first
-	std::fprintf(stream, " [%s] ", level_strings[level]); // Then, print the level label, e.g TRACE, ERROR
-	std::vfprintf(stream, format, list);
 	
+	std::fprintf(stream, "%s %s%s:%d [%s] \x1b[0m",
+		time_buffer, this->use_color ? this->level_colors[level] : "",
+		filename, line, this->level_strings[level]);
+	std::vfprintf(stream, format, list);
+
 	va_end(list);
 	std::fwrite("\n", 1, 1, stream);
 }

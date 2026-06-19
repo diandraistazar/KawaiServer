@@ -27,16 +27,6 @@ double Utils::get_time() {
 	return (double)(tm.tv_sec * NSEC_PER_SECONDS + tm.tv_nsec - offset) / (double)NSEC_PER_SECONDS;
 }
 
-std::string Utils::lowercase(char *source) {
-	std::string buffer = "";
-
-	for(char *ptr = source; *ptr != 0; ptr++) {
-		buffer.push_back(std::tolower(*ptr));
-	}
-
-	return buffer;
-}
-
 int Utils::converto(int to, int data, char *dest) {
 	if(to == Utils::IP4_ADDR_STR) {
 		struct in_addr a = { (in_addr_t) data };
@@ -53,7 +43,7 @@ int Utils::converto(int to, int data, char *dest) {
 	return 0;
 }
 
-size_t Utils::read_file(char *filepath, std::string &dest) {
+ssize_t Utils::read_file(std::string &filepath, std::string &dest) {
 	std::ifstream file(filepath);
 	std::stringstream temp;
 
@@ -63,52 +53,35 @@ size_t Utils::read_file(char *filepath, std::string &dest) {
 	return temp.str().size();
 }
 
-size_t Utils::list_dir(char *fullpath, std::vector<char*> &dest) {
-	DIR *dir = opendir(fullpath);
-	if(dir == nullptr)
-		return -1;
-	
-	struct dirent *dirp = nullptr;
-	size_t count = 0;
-	while((dirp = readdir(dir)) != nullptr) {
-		dest.push_back(dirp->d_name);
-		count++;
-	}
-
-	closedir(dir);
-	return count;
-}
-
-size_t Utils::get_filesize(char *filepath) {
+ssize_t Utils::get_filesize(std::string &filepath) {
 	struct stat buffer;
 
-	if(stat(filepath, &buffer) < 0)
+	if(stat(filepath.data(), &buffer) < 0)
 		return -1;
 
 	return buffer.st_size;
 }
 
-char *Utils::get_filext(char *filepath) {
-	char *ptr = filepath;
+std::string Utils::get_filext(std::string &filepath) {
+	ssize_t pos;
 
-	for(int i = std::strlen(ptr) - 1; i; i--) {
-		if(ptr[i] == '.')
-			return ptr + i + 1;
-	}
+	pos = filepath.rfind(".");
+	if(pos == std::string::npos)
+		return "";
 
-	return nullptr;
+	return filepath.substr(pos + 1, filepath.size() - (pos + 1));
 }
 
-const char *Utils::get_mimetype(char *filepath) {
+std::string Utils::get_mimetype(std::string &filepath) {
 	std::string file_ext = Utils::get_filext(filepath);
+	
+	// Default the filepath doesn't have file extension 
 	if(file_ext.empty())
-		return mime_types[Utils::PLAIN];
+		return Utils::mime_types["txt"];
+	
+	auto search = Utils::mime_types.find(file_ext);
+	if(search != Utils::mime_types.end())
+		return search->second;
 
-	for(int i = 0; i < Utils::MIME_TYPE_COUNT; i++)
-		if(file_ext == ext_types[i])
-			return mime_types[i];
-
-	return nullptr;
+	return "";
 }
-
-

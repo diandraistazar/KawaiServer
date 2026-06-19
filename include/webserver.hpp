@@ -4,9 +4,6 @@
 #include <sys/un.h>
 #include "http.hpp"
 
-#define LOCAL_PATH "/tmp/kawaiserver-php-local"
-#define LOCAL_PATH_LEN sizeof(LOCAL_PATH)
-
 struct Client {
 	struct sockaddr_in client_sock;
 	char ip_addr[16] = {0}, port[16] = {0};
@@ -19,10 +16,9 @@ struct Client {
 
 struct Server {
 	struct sockaddr_in server_sock;
-	struct sockaddr_un php_sock;
 	char *root_path = nullptr;
 	char ip_addr[16] = {0}, port[16] = {0};
-	int server_fd, php_fd;
+	int server_fd;
 	bool is_continue = true;
 	
 	~Server();
@@ -37,11 +33,13 @@ struct Server {
 private:
 	static void terminate(int signal);
 	
-	size_t recv_data(int fd, std::string &dest);
-	size_t send_data(int fd, std::string &buffer);
-	size_t send_file(int fd, std::string &filepath);
+	ssize_t read_data(int fd, std::string &dest); // only for reading read end pipe in php_service, i dont know why recv_data doesn't work
+	ssize_t recv_data(int fd, std::string &dest);
+	ssize_t send_data(int fd, std::string &buffer);
+	ssize_t send_file(int fd, std::string &filepath);
 	void handling_client(struct Client &client);
 	int accept_client(class Client &client);
+	int php_service(std::string &php_file, std::string &dest);
 
 	void handle_get(struct Http::request_msg &_request, struct Client &client);
 };

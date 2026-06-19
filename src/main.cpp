@@ -15,9 +15,10 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	logging.info("server setup is running...");
-
+	logging.level = Logging::LOG_TRACE;
 	server.root_path = argv[3]; // Set the root path
+	
+	logging.info("server setup is running...");
 	
 	if(server.initialize() < 0) {
 		logging.error("server.initialize() returns non-zero");

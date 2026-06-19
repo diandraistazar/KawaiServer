@@ -1,7 +1,7 @@
 CXX := g++
-CXXFLAGS := -Oz -march=native
+CXXFLAGS := -O3 -march=native
 INC := -I../library
-LIBS := -lmagic
+LIBS := 
 
 SRC := ./src/
 OBJ := main.o logging.o webserver.o http.o utils.o

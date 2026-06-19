@@ -68,7 +68,12 @@ int Http::parse_http_header(std::string &message, struct Http::msg &http) {
 			
 		pos_now = first.find(" ");
 		request->method = first.substr(pos_last, pos_now - pos_last);
-			
+		
+		// I need to add query handling
+		// https:://google.com/index.html?key=value&key=value
+		// ? sign is the beginning of the queries
+		// key=value is the query in key-value pair
+		// & is seperator between queries
 		pos_last = pos_now + 1;
 		pos_now = first.rfind(" ");
 		request->path = first.substr(pos_last, pos_now - pos_last);
@@ -99,7 +104,7 @@ int Http::parse_http_header(std::string &message, struct Http::msg &http) {
 
     return 0;
 };
-	
+
 // For handle both string key and value
 void Http::push_token(struct Http::msg &http, char *key, char *value) {
 	struct Http::Header header;

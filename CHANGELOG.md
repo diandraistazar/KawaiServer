@@ -1,24 +1,27 @@
 # Changelog
 Any changes to this project, will be documented here
 
-## 0.0.2 - 2026-06-16
+## 0.0.2 - 2026-06-19
 
 ### Added
 
-- Unix/Local socket added and point to ```/tmp/kawaiserver-local``` for communicating with PHP (it's not finished yet).
+- ```read_file()``` dedicated to reading read end pipe in PHP service.
+- Logging with color suppport.
+- PHP service, so that a file with .php extension can be processed by PHP and send the result to a client.
 - Built-in mime types checking. Previously used ```libmagic```, but it couldn't handle them properly.
 - Specify the root path explicity.
 - Signal handling for terminating the server.
 - If clients request ```/```, then the server is going to send either ```/index.html``` or ```/index.php``` (based on the root path) instead.
-- If clients request a directory, the server is going to find ```index.html``` or ```/index.php``` in that directory instead.
+- If clients request a directory, the server is going to find ```index.html``` or ```index.php``` in that directory instead.
 - Show how long the program have run in seconds.
 
 ### Changed
 
+- Instead of hardcoded status codes and status descs, they stored into an unordered map named status_messages.
+- Mime types are grouped into an unordered map with the file extension as the key.
 - Sending parts are in each methods.
-- ```start()``` changed to ```run()``` because it's better.
 - ```recv_data()``` can receive data of unlimited size now.
-- ```send_data()``` sends data in chunks (each of them is 128 bytes or lower) instead of fullsize directly.
+- ```send_data()``` sends data in chunks (each of them is 64 bytes or lower) instead of fullsize directly.
 - ```send_file()``` sends data until the number of sent bytes returned is equal to the size of the original data.
 - ```create_sock()``` changed to ```create_sockets()```, it only provides the host and the service, the rest of arguments is abstracted now.
 - ```set_sockopt()``` changed to ```set_socket_options()```, it doesn't provide any arguments, the rest of arguments is abstracted now.

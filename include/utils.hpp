@@ -1,26 +1,28 @@
 #pragma once
 
 #include <string>
-#include <vector>
-#include <array>
+#include <unordered_map>
 
 namespace Utils {
 	enum Converto { IP4_ADDR_STR, PORT_STR };
 	
-	enum { PLAIN, HTML, CSS, JAVASCRIPT, PHP, MIME_TYPE_COUNT };
-	static std::array<const char*, MIME_TYPE_COUNT> mime_types = {
-		"text/plain", "text/html", "text/css", "text/javascript", "text/php"
-	};
-	static std::array<const char*, MIME_TYPE_COUNT> ext_types = {
-		"txt", "html", "css", "js", "php"
+	static std::unordered_map<std::string, std::string> mime_types = {
+		{ "txt", "text/plain" },
+		{ "html", "text/html" },
+		{ "htm", "text/html" },
+		{ "css", "text/css" },
+		{ "js", "text/javascript" },
+		{ "php", "text/php" },
+		{ "jpeg", "image/jpeg" },
+		{ "jpg", "image/jpeg" },
+		{ "mp3", "audio/mpeg" },
+		{ "mp4", "video/mp4" },
 	};
 
 	double get_time();
-	std::string lowercase(char *source);
 	int converto(int to, int data, char *dest);
-	size_t read_file(char *filepath, std::string &dest);
-	size_t list_dir(char *fullpath, std::vector<char*> &dest);
-	size_t get_filesize(char *filepath);
-	char *get_filext(char *filepath);
-	const char *get_mimetype(char *filepath);
+	ssize_t read_file(std::string &filepath, std::string &dest);
+	ssize_t get_filesize(std::string &filepath);
+	std::string get_filext(std::string &filepath);
+	std::string get_mimetype(std::string &filepath);
 }
