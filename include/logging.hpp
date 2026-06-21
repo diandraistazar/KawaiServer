@@ -13,20 +13,18 @@
 #define error(...) log(Logging::LOG_ERROR, __FILE__, __LINE__, __VA_ARGS__)
 #define fatal(...) log(Logging::LOG_FATAL, __FILE__, __LINE__, __VA_ARGS__)
 
-struct Logging {
+namespace Logging {
 	enum { LOG_TRACE, LOG_DEBUG, LOG_INFO, LOG_WARN, LOG_ERROR, LOG_FATAL };
 	
-	int level = LOG_TRACE, use_color = true; // Level of logging and should use color (either true or false)
+	extern int level, use_color;
 
-	// For string level
-	std::array<const char*, 6> level_strings = {
+	static std::array<const char*, 6> level_strings = {
   		"TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"
 	};
 	
-	// For level coloring
-	std::array<const char*, 6> level_colors = {
+	static std::array<const char*, 6> level_colors = {
   		"\x1b[94m", "\x1b[36m", "\x1b[32m", "\x1b[33m", "\x1b[31m", "\x1b[35m"
 	};
 	
-	void log(int level, const char *filename, int line, const char *format, ...);
+	extern void log(int level, const char *filename, int line, const char *format, ...);
 };

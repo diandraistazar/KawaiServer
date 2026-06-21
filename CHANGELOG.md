@@ -1,6 +1,25 @@
 # Changelog
 Any changes to this project, will be documented here
 
+## 0.0.3 - 2026-06-21
+
+### Added
+
+- Query handling.
+- HEAD method, actually using ```handle_get()``` with ```true``` value passed to ```bool header_only``` parameter.
+- Error handling when parsing either HTTP request or HTTP response.
+
+### Fixed
+
+- Header parser in ```Http::parse_http_header()``` works fine now.
+
+### Changed
+
+- ```Server::php_service``` has additional argument named ```_request```, it used to give several informations to PHP service (e.g request_path, root_path).
+- ```struct Logging``` is not structure anymore, it changed to ```namespace Logging```. So that, whenever you modify the logging behavior in any source files, it can influnce others.
+- ```struct Http::Header headers``` member in ```struct Http::response_msg```, ```struct Http::request_msg```, and ```struct Http::msg``` replaced by ```std::unordered_map<string, string> headers```. It's just better.
+- ```Http::push_token()``` adjusted based on ```std::unordered_map<string, string> headers```.
+
 ## 0.0.2 - 2026-06-19
 
 ### Added

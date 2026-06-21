@@ -39,7 +39,8 @@ private:
 	ssize_t send_file(int fd, std::string &filepath);
 	void handling_client(struct Client &client);
 	int accept_client(class Client &client);
-	int php_service(std::string &php_file, std::string &dest);
-
-	void handle_get(struct Http::request_msg &_request, struct Client &client);
+	int php_service(std::string &php_file, Http::request_msg &_request, std::string &dest);
+	
+	void handle_head(struct Http::request_msg &_request, struct Client &client);
+	void handle_get(struct Http::request_msg &_request, struct Client &client, bool header_only);
 };

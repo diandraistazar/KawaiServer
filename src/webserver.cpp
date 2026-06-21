@@ -3,6 +3,7 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <signal.h>
 #include <cerrno>
 #include <cstring>
@@ -17,7 +18,6 @@
 	Some extern variabels
 */
 
-extern Logging logging;
 extern Server server;
 
 /*
@@ -63,14 +63,14 @@ int Server::initialize() {
 }
 
 void Server::run() {
-	logging.info("server opened HTTP service");
-	logging.info("root-path is %s", this->root_path);
+	Logging::info("server opened HTTP service");
+	Logging::info("root-path is %s", this->root_path);
 
 	while(this->is_continue) {
 		struct Client client;
 
 		if(this->accept_client(client) < 0) {
-			logging.error("server can't accept client");
+			Logging::error("server can't accept client");
 			continue;
 		}
 		
@@ -87,9 +87,9 @@ int Server::create_sockets(char *host, char *service) {
 		.ai_protocol = 0,
 	};
 
-	int return_value = getaddrinfo(host, service, &hints, &addr);
+	int r_value = getaddrinfo(host, service, &hints, &addr);
 	if(addr == nullptr) {
-		logging.error("getaddrinfo(): %s", gai_strerror(return_value));
+		Logging::error("getaddrinfo(): %s", gai_strerror(r_value));
 		return -1;
 	}
 
@@ -136,7 +136,7 @@ int Server::listen_sockets() {
 	intended for server internal operations only
 */
 void Server::terminate(int signal) {
-	logging.info("server received a terminate signal (either SIGTERM or SIGINT). terminating");
+	Logging::info("server received a terminate signal (either SIGTERM or SIGINT). terminating");
 
 	server.is_continue = false;
 }
@@ -246,25 +246,27 @@ void Server::handling_client(struct Client &client) {
 
 	received_bytes = this->recv_data(client.client_fd, request); 
 	if(received_bytes <= 0){
-		logging.error("server couldn't receive or request size is 0 bytes");
+		Logging::error("server couldn't receive or request size is 0 bytes");
 		return;
 	}
 
-	logging.info("server received %d bytes from %s:%s", received_bytes, client.ip_addr, client.port);
+	Logging::info("server received %d bytes from %s:%s", received_bytes, client.ip_addr, client.port);
 
 	if(Http::parse_http_header(request, (struct Http::msg&) _request) < 0) {
-		logging.error("server couldn't parse HTTP request");
+		Logging::error("server couldn't parse HTTP request");
 		return;
 	}
 	
-	logging.info("HTTP request is parsed");
+	Logging::info("HTTP request is parsed");
 
-	logging.info(
+	Logging::info(
 		"%s:%s %s, requests %s%s",
 		client.ip_addr, client.port, _request.method.data(), this->root_path, _request.path.data());
 
-	if(_request.method == "GET")
-		this->handle_get(_request, client);
+	if(_request.method == "HEAD")
+		this->handle_head(_request, client);
+	else if(_request.method == "GET")
+		this->handle_get(_request, client, false);
 }
 
 int Server::accept_client(class Client &client) {
@@ -286,7 +288,7 @@ int Server::accept_client(class Client &client) {
 	return 0;
 }
 
-int Server::php_service(std::string &php_file, std::string &dest) {
+int Server::php_service(std::string &php_file, Http::request_msg &_request, std::string &dest) {
 
 #define EXIT_PHP(a) r_value = a; goto php_service_exit;
 
@@ -294,14 +296,15 @@ int Server::php_service(std::string &php_file, std::string &dest) {
 	pid_t php_pid;
 	struct timeval timeout = { .tv_sec = 3, .tv_usec = 0 }; // Exactly 3 seconds
 	fd_set readfds, writefds;
+	std::string path;
 
 	if(pipe(pipe_fd) < 0) {
-		logging.error("server can't create pipes for PHP service");
+		Logging::error("server can't create pipes for PHP service");
 		EXIT_PHP(-1);
 	}
 
 	if((null_fd = open("/dev/null", O_WRONLY)) < 0) {
-		logging.error("server can't open /dev/null");
+		Logging::error("server can't open /dev/null");
 		EXIT_PHP(-1);
 	}
 
@@ -311,49 +314,52 @@ int Server::php_service(std::string &php_file, std::string &dest) {
 	FD_SET(pipe_fd[1], &writefds);
 
 	if(select(pipe_fd[1] + 1, &readfds, &writefds, nullptr, &timeout) < 1) { // Checking whetever created pipes are ready to be reading or writing
-		logging.error("server received that select() returns either non-zero or zero");
+		Logging::error("server received that select() returns either non-zero or zero");
 		EXIT_PHP(-1);
 	}
 
-	//if(!FD_ISSET(pipe_fd[0], &readfds) || !FD_ISSET(pipe_fd[1], &writefds)) { // only pipe_fd[0] (read pipe) isn't present. hmm
-		//logging.error("either a set of FD_ISSET() return false");
+	//if(!FD_ISSET(pipe_fd[0], &readfds) || !FD_ISSET(pipe_fd[1], &writefds)) { // only pipe_fd[0] (read pipe) doesn't present. hmm
+		//Logging::error("either a set of FD_ISSET() return false");
 		//goto php_cleanup;
 	//}
 
 	if(fcntl(pipe_fd[0], F_SETFL, O_NONBLOCK) < 0) { // so that no blocking during reading
-		logging.error("server can't modify read end fd");
+		Logging::error("server can't modify read end fd");
 		EXIT_PHP(-1);
 	}
 
 	php_pid = fork();
 	if(php_pid < 0) {
-		logging.error("server can't fork for PHP service");
+		Logging::error("server can't fork for PHP service");
 		EXIT_PHP(-1);
 	}
 
 	else if(php_pid == 0) {
 		if(dup2(pipe_fd[1], STDOUT_FILENO) < 0) {
-			logging.error("server can't redirect write pipe fd to STDOUT_FILENO");
+			Logging::error("server can't redirect write pipe fd to STDOUT_FILENO");
 			exit(-1);
 		}
 		if(dup2(null_fd, STDERR_FILENO) < 0) {
-			logging.error("server can't redirect STDERR fd to /dev/null");
+			Logging::error("server can't redirect STDERR fd to /dev/null");
 			exit(-1);
 		}
 
+		setenv("ROOT_PATH", this->root_path, true);
+		setenv("REQUEST_PATH", _request.queries["path"].data(), true);
+
 		execl("/usr/bin/php", "-f", php_file.data());
-		exit(-1); // This line would be executed if execl() is failed to run php
+		exit(-1); // This line would be executed if execl() is failed to run PHP service
 	}
 	
 	waitpid(php_pid, &status, 0);
 
 	if(!WIFEXITED(status) || (WEXITSTATUS(status) != 0)) {
-		logging.error("PHP isn't returned normally");
+		Logging::error("PHP isn't returned normally");
 		EXIT_PHP(-1);
 	}
 
 	if(read_data(pipe_fd[0], dest) < 0) {
-		logging.error("server can't receive message from PHP service");
+		Logging::error("server can't receive message from PHP service");
 		EXIT_PHP(-1);
 	}
 
@@ -368,14 +374,19 @@ php_service_exit:
 
 /*
 	Those below functions used to handle client request,
-	e.g GET, PUT, and so on. Currently only GET
+	e.g GET, HEAD, PUT, and so on. Currently only GET
 */
 
 #define PUSH(a, b) Http::push_token((struct Http::msg&) _response, (char *) a, b);
 
-void Server::handle_get(struct Http::request_msg &_request, struct Client &client) {
+void Server::handle_head(struct Http::request_msg &_request, struct Client &client) {
+	this->handle_get(_request, client, true);
+}
+
+void Server::handle_get(struct Http::request_msg &_request, struct Client &client, bool header_only) {
 	struct Http::response_msg _response;
-	std::string request_path, response, body;
+	std::string request_path, response, body, mimetype;
+	int r_value;
 	bool sendfile;
 	// true -> Used when sending a file. It's directly sending file to client instead of loading into memory. It helps reduce time consuming and improve server latency and memory.
 	// false -> Used when sending non-file (e.g hardcoded data). The data stored in memory, and need to send client.
@@ -384,6 +395,9 @@ void Server::handle_get(struct Http::request_msg &_request, struct Client &clien
 	_response.version = "HTTP/1.0";
 	
 	request_path = this->root_path;
+	if(request_path.back() == '/')
+		request_path.pop_back();
+
 	request_path += _request.path; // '.' + '/home/diandra...'
 	
 	if(std::filesystem::is_directory(request_path)) {
@@ -394,9 +408,8 @@ void Server::handle_get(struct Http::request_msg &_request, struct Client &clien
 	}
 
 	if(std::filesystem::is_regular_file(request_path)) { // This block will check two conditions, is exists and is regular file 
-		logging.info("%s is found", request_path.data());
+		Logging::info("%s is found", request_path.data());
 
-		std::string mimetype;
 		sendfile = true;
 
 		mimetype = Utils::get_mimetype(request_path);
@@ -404,8 +417,8 @@ void Server::handle_get(struct Http::request_msg &_request, struct Client &clien
 			mimetype = Utils::mime_types["txt"];
 
 		else if(mimetype == Utils::mime_types["php"]) {
-			if(Server::php_service(request_path, body) < 0)
-				logging.error("something went wrong when server communicates with PHP");
+			if(Server::php_service(request_path, _request, body) < 0)
+				Logging::error("something went wrong when server communicates with PHP");
 			
 			else {
 				sendfile = false;
@@ -419,45 +432,65 @@ void Server::handle_get(struct Http::request_msg &_request, struct Client &clien
 			PUSH("Content-Type", mimetype.data());
 		}
 
+		PUSH("Content-Location", request_path.data() + std::strlen(this->root_path));
+		
 		_response.status_code = std::to_string(200);
 		_response.status_desc = Http::status_messages[200];
-		
-		PUSH("Content-Location", request_path.data() + std::strlen(this->root_path));
 	}
 	else {
-		logging.warn("%s isn't found", request_path.data());
+		Logging::warn("%s isn't found", request_path.data());
 		
-		sendfile = false;
-		
-		body = "<h1>we couldn't found requested resource</h1>";
+		sendfile = true;
 
+		request_path = this->root_path;
+		request_path += "/not-found.php";
+
+		mimetype = Utils::get_mimetype(request_path);
+		if(mimetype.empty())
+			mimetype = Utils::mime_types["txt"];
+
+		else if(mimetype == Utils::mime_types["php"]) {
+			if(Server::php_service(request_path, _request, body) < 0)
+				Logging::error("something went wrong when server communicates with PHP");
+
+			else {
+				sendfile = false;
+				
+				PUSH("Content-Type", Utils::mime_types["html"].data());
+				PUSH("Content-Length", body.size());
+			}
+		}
+		else {
+			PUSH("Content-Type", Utils::mime_types["html"].data());
+			PUSH("Content-Length", body.size());
+		}
+		
 		_response.status_code = std::to_string(404);
 		_response.status_desc = Http::status_messages[404];
-
-		PUSH("Content-Type", (char *) "text/html");
-		PUSH("Content-Length", body.size());
-		
-		request_path = this->root_path;
-		request_path += "/not-found.html";
 	}
 	
-	Http::create_http_header_str((struct Http::msg&) _response, response); // Append HTTP header
-	response.append("\r\n"); // Then empty line to seperate HTTP header and Body 
+	PUSH("Server", (char *) "KawaiServer");
 
+	Http::create_http_header_str((struct Http::msg&) _response, response); // Append HTTP header
+	
+	if(!header_only)
+		response.append("\r\n"); // Then empty line to seperate HTTP header and Body 
+	
 	if(this->send_data(client.client_fd, response) < 0) {
-		logging.error("failure to send %s:%s request", client.ip_addr, client.port);
+		Logging::error("failure to send %s:%s request", client.ip_addr, client.port);
 		return;
 	}
 	
-	if(sendfile)
-		if(this->send_file(client.client_fd, request_path) < 0)
-			logging.error("failure to send %s:%s %s request", client.ip_addr, client.port, request_path.data());
-		else
-			logging.info("success to send %s:%s %s request", client.ip_addr, client.port, request_path.data());
+	if(header_only) // When you call handle_get through handle_head
+		return;
 
+	if(sendfile)
+		r_value = this->send_file(client.client_fd, request_path);
 	else
-		if(this->send_data(client.client_fd, body) < 0)
-			logging.error("failure to send %s:%s %s request", client.ip_addr, client.port, request_path.data());
-		else
-			logging.info("success to send %s:%s %s request", client.ip_addr, client.port, request_path.data());
+		r_value = this->send_data(client.client_fd, body);
+
+	if(r_value < 0)
+		Logging::error("failure to send %s:%s %s request", client.ip_addr, client.port, request_path.data());
+	else
+		Logging::info("success to send %s:%s %s request", client.ip_addr, client.port, request_path.data());
 }

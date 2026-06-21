@@ -24,10 +24,10 @@ int Http::create_http_header_str(struct Http::msg &http, std::string &dest) {
 	else
 		return -1;
 
-	for(const struct Http::Header &header : http.headers) {
-		dest.append(header.key);
+	for(auto &pair : http.headers) {
+		dest.append(pair.first);
 		dest.append(": ");
-		dest.append(header.value);
+		dest.append(pair.second);
 		dest.append("\r\n");
 	}
 
@@ -39,7 +39,7 @@ int Http::parse_http_header(std::string &message, struct Http::msg &http) {
 
 	size_t newline_pos = message.find("\n");
 	first = message.substr(0, newline_pos);
-	headers = message.substr(newline_pos + 1, message.size() - (newline_pos + 1));
+	headers = message.substr(newline_pos + 1, message.size() - newline_pos + 1);
 
     // If the header is Response HTTP/
 	if(first.substr(0, 6) == "HTTP/") {
@@ -48,25 +48,29 @@ int Http::parse_http_header(std::string &message, struct Http::msg &http) {
 		
 		response->mode = Http::HTTP_RESPONSE;
 
-		pos_now = first.find(" ");
-		response->version = first.substr(pos_last, pos_now);
+		if((pos_now = first.find(" ")) == std::string::npos)
+			return -1;
+
+		response->version = first.substr(pos_last, pos_now - pos_last);
 			
 		pos_last = pos_now + 1;
-		pos_now = first.rfind(" ");
-		response->status_code = first.substr(pos_last, pos_now);
+		if((pos_now = first.rfind(" ")) == std::string::npos)
+			return -1;
+
+		response->status_code = first.substr(pos_last, pos_now - pos_last);
 
 		pos_last = pos_now + 1;
-		pos_now = first.rfind("\n");
-		response->status_desc = first.substr(pos_last, pos_now);
+		response->status_desc = first.substr(pos_last, first.size() - pos_last);
     }
-    // Else, the header is Request
-	else if(first[0] != 0 && first[0] != ' ') {
+	else if(first[0] != 0 && first[0] != ' ') { // Else, the header is Request
         struct Http::request_msg *request = (struct Http::request_msg*) &http;
 		size_t pos_last = 0, pos_now = 0;
 
 		request->mode = Http::HTTP_REQUEST;
 			
-		pos_now = first.find(" ");
+		if((pos_now = first.find(" ")) == std::string::npos)
+			return -1;
+
 		request->method = first.substr(pos_last, pos_now - pos_last);
 		
 		// I need to add query handling
@@ -75,31 +79,65 @@ int Http::parse_http_header(std::string &message, struct Http::msg &http) {
 		// key=value is the query in key-value pair
 		// & is seperator between queries
 		pos_last = pos_now + 1;
-		pos_now = first.rfind(" ");
+		if((pos_now = first.rfind(" ")) == std::string::npos)
+			return -1;
+
 		request->path = first.substr(pos_last, pos_now - pos_last);
-
+		
 		pos_last = pos_now + 1;
-		pos_now = first.rfind("\n");
-		request->version = first.substr(pos_last, pos_now);
-    }
-    // The message is invalid
-    else { 
-        return -1;
-	}
-	
-	struct Http::Header header;
-	size_t seperator = 0, last_string = 0, first_string = 0;
-	while(true) {
-		first_string = last_string;
-		seperator = headers.find_first_of(": ", first_string + 1);
-		last_string = headers.find_first_of("\n", seperator + 2); // ': ' start after the seperator
+		request->version = first.substr(pos_last, first.size() - pos_last);
+		
+		// Query handling
+		pos_last = request->path.find("?");
+		if(pos_last != std::string::npos) {
+			std::string queries, query, key, value;
+			size_t seperator;
+			bool looping = true;
 
-		if(seperator == -1 || last_string == -1)
+			queries = request->path.substr(pos_last + 1, request->path.size() - (pos_last + 1));
+			request->path = request->path.substr(0, pos_last);
+			
+			pos_last = -1;
+			while(looping) {
+				pos_now = pos_last + 1;
+				pos_last = queries.find_first_of("&", pos_now);
+	
+				if(pos_last == std::string::npos)
+					looping = false;
+
+				query = queries.substr(pos_now,
+					(pos_last == std::string::npos ? queries.size() : pos_last)
+					- pos_now
+				);
+
+				if((seperator = query.find("=")) == std::string::npos)
+					continue;
+				
+				key = query.substr(0, seperator);
+				value = query.substr(seperator + 1, query.size() - (seperator + 1));
+				request->queries[key] = value;
+			}
+		}
+    } else
+		return -1;
+	
+	std::string key, value, line;
+	size_t first_string = 0, last_string = -1, seperator = 0;
+	while(true) {
+		first_string = last_string + 1;
+		last_string = headers.find_first_of("\n", first_string); // start after \n
+
+		if(last_string == std::string::npos)
+			break;
+		
+		line = headers.substr(first_string, last_string - first_string); // get the current processed header line
+		
+		if((seperator = line.find_first_of(": ", 0)) == std::string::npos)
 			break;
 
-		header.key = headers.substr(first_string + 1, seperator);
-		header.value = headers.substr(seperator + 2, last_string);
-		http.headers.push_back(header);
+		key = line.substr(0, seperator);
+		value = line.substr(seperator + 2, last_string - (seperator + 2));
+		http.headers[key] = value;
 	}
 
     return 0;
@@ -107,20 +145,11 @@ int Http::parse_http_header(std::string &message, struct Http::msg &http) {
 
 // For handle both string key and value
 void Http::push_token(struct Http::msg &http, char *key, char *value) {
-	struct Http::Header header;
 	if(key != nullptr)
-		header.key = key;
-	if(value != nullptr)
-		header.value = value;
-
-	http.headers.push_back(header);
+		http.headers[key] = value;
 }
 // For handle string key and integer value
 void Http::push_token(struct Http::msg &http, char *key, long long value) {
-	struct Http::Header header;
 	if(key != nullptr)
-		header.key = key;
-	header.value = std::to_string(value);
-
-	http.headers.push_back(header);
+		http.headers[key] = std::to_string(value);
 }

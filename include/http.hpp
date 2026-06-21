@@ -12,26 +12,23 @@ namespace Http {
 		{ 404, "Not Found" }
 	};
 
-	struct Header {
-		std::string key, value;
-	};
-
 	struct request_msg {
-		int mode = -1; // Must be HTTP_REQUEST
+		int mode; // Must be HTTP_REQUEST
 		std::string method, version, path;
-		std::vector<struct Header> headers;
+		std::unordered_map<std::string, std::string> queries, headers;
 	};
 
 	struct response_msg {
-		int mode = -1; // Must be HTTP_RESPONSE
+		int mode; // Must be HTTP_RESPONSE
 		std::string version, status_code, status_desc;
-		std::vector<struct Header> headers;
+		char padding[sizeof(std::unordered_map<std::string, std::string>)];
+		std::unordered_map<std::string, std::string> headers;
 	};
 
 	struct msg {
-    	int mode = -1; // either HTTP_REQUEST or HTTP_RESPONSE
-    	char data[sizeof(std::string) * 3] = {0};
-		std::vector<struct Header> headers;
+    	int mode; // either HTTP_REQUEST or HTTP_RESPONSE
+    	char padding[sizeof(std::string) * 3 + sizeof(std::unordered_map<std::string, std::string>)];
+		std::unordered_map<std::string, std::string> headers;
 	};
 
 	int create_http_header_str(struct Http::msg &http, std::string &dest);

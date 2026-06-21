@@ -1,5 +1,5 @@
-CXX := g++
-CXXFLAGS := -O3 -march=native
+CXX := clang++
+CXXFLAGS := -Oz -march=native
 INC := -I../library
 LIBS := 
 

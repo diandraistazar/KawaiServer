@@ -2,7 +2,6 @@
 #include "../include/webserver.hpp"
 #include "../include/utils.hpp"
 
-Logging logging;
 Server server;
 
 int main(int argc, char *argv[]) {
@@ -15,48 +14,48 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	logging.level = Logging::LOG_TRACE;
+	Logging::level = Logging::LOG_TRACE;
 	server.root_path = argv[3]; // Set the root path
 	
-	logging.info("server setup is running...");
+	Logging::info("server setup is running...");
 	
 	if(server.initialize() < 0) {
-		logging.error("server.initialize() returns non-zero");
+		Logging::error("server.initialize() returns non-zero");
 		return 1;
 	}
 
 	if(server.create_sockets(argv[1], argv[2]) < 0) {
-		logging.error("server.create_socket() returns non-zero");
+		Logging::error("server.create_socket() returns non-zero");
 		return 1;
 	}
 	
-	logging.info("server socket created successfully");
+	Logging::info("server socket created successfully");
 
 	if(server.set_socket_options() < 0) {
-		logging.error("server.set_socket_option() returns non-zero");
+		Logging::error("server.set_socket_option() returns non-zero");
 		return 1;
 	}
 	
-	logging.info("socket options set successfully");
+	Logging::info("socket options set successfully");
 	
 	if(server.bind_sockets() < 0) {
-		logging.error("server.bind_socket() returns non-zero");
+		Logging::error("server.bind_socket() returns non-zero");
 		return 1;
 	}
 	
-	logging.info("socket bounded to %s:%s successfully", server.ip_addr, server.port);
+	Logging::info("socket bounded to %s:%s successfully", server.ip_addr, server.port);
 
 	if(server.listen_sockets() < 0) {
-		logging.error("server.listen_socket() returns non-zero");
+		Logging::error("server.listen_socket() returns non-zero");
 		return 1;
 	}
 
-	logging.info("socket now is listening connections");
+	Logging::info("socket now is listening connections");
 
 	server.run();
-	logging.info("server terminated");
+	Logging::info("server terminated");
 	
 	end = Utils::get_time();
-	logging.info("program was running for about %.2f seconds", end - start);
+	Logging::info("program was running for about %.2f seconds", end - start);
 	return 0;
 }
