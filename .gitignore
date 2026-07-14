@@ -1,3 +1,2 @@
-compile_commands.json
-*.out
-*.o
+build
+*.jar
