@@ -1,6 +1,17 @@
 # Changelog
 Any changes to this project, will be documented here
 
+### 1.0.0 - 2026-07-14
+
+### Added
+
+- Show server configuration at the beginning of program.
+- Show connected client info every time the client connected.
+
+### Changed
+
+- Migrate from C++ to Java for cross-platform compability between Windows and Linux.
+
 ## 0.0.3 - 2026-06-21
 
 ### Added

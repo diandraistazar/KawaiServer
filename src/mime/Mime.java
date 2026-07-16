@@ -13,10 +13,15 @@ public class Mime {
 		// Audio
 		mimeTypes.put("mp3", "audio/mpeg");
 
+		// Image
+		mimeTypes.put("png", "image/png");
+		mimeTypes.put("jpg", "image/jpg");
+
 		// Text
 		mimeTypes.put("txt", "text/plain");
 		mimeTypes.put("html", "text/html");
 		mimeTypes.put("css", "text/css");
+		mimeTypes.put("php", "text/php");
 	}
 
 	public static String getFileExt(String filePath) {

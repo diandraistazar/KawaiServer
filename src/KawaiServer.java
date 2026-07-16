@@ -6,8 +6,12 @@ import java.io.EOFException;
 import java.io.FileNotFoundException;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.util.Map;
 import java.util.Arrays;
+import java.util.List;
 import java.util.logging.Logger;
+import java.lang.ProcessBuilder;
+import java.lang.Process;
 
 import http.httpParser;
 import http.httpObject;
@@ -15,11 +19,12 @@ import mime.Mime;
 
 public class KawaiServer {
 	public static final Logger LOGGER = Logger.getLogger(KawaiServer.class.getName());
-	public static InetAddress ip_address = null;
+	public static InetAddress IPAddress = null;
 	public static int port = 0;
 	public static File rootDir = null;
 	
 	private static ServerSocket socket = null;
+	private static boolean looping = true;
 
 	static {
 		// $1 = date
@@ -75,7 +80,7 @@ public class KawaiServer {
 	public static boolean setupServer(String[] args) {
 		// Set the server socket's IP address
 		try {
-			ip_address = InetAddress.getByName(args[0]);
+			IPAddress = InetAddress.getByName(args[0]);
 		} catch(UnknownHostException e) {
 			KawaiServer.LOGGER.severe("The specified ip address is unknown");
 			return false;
@@ -91,7 +96,7 @@ public class KawaiServer {
 
 		// Create the server socket
 		try {
-			socket = new ServerSocket(port, 1, ip_address);
+			socket = new ServerSocket(port, 1, IPAddress);
 		} catch(IOException e) {
 			KawaiServer.LOGGER.severe("while creating a new server socket " + e);
 			return false;
@@ -194,7 +199,7 @@ public class KawaiServer {
 	public static void startServer() {
 		KawaiServer.LOGGER.info("Listening connections..");
 
-		while(true) {
+		while(KawaiServer.looping) {
 			KawaiClient client = null;
 			
 			try{
@@ -214,46 +219,174 @@ public class KawaiServer {
 		}
 	}
 
+	// These below are services
+	public static String PHPService(httpObject httpData, String file) {
+		ProcessBuilder php = new ProcessBuilder("php", file);
+		DataInputStream phpInput = null;
+		Process phpProc = null;
+		byte[] data = null;
+		Map<String, String> envs = php.environment();
+		
+		envs.put("ROOT_DIR", KawaiServer.rootDir.getPath());
+		envs.put("REQUEST_PATH", httpData.requestPath);
+
+		for(Map.Entry<String, String> parameter : httpData.parameters.entrySet()) {
+			envs.put(parameter.getKey(), parameter.getValue());
+		}
+
+		try {
+			phpProc = php.start();
+			phpProc.waitFor();
+
+			if(phpProc.exitValue() != 0) {
+				KawaiServer.LOGGER.severe("Exit code of PHP is non-zero");
+				return null;
+			}
+			
+			phpInput = new DataInputStream(phpProc.getInputStream());
+			if(phpInput.available() > 0) {
+				data = new byte[phpInput.available()];
+			} else {
+				return null;
+			}
+			
+			phpInput.read(data);
+		} catch(Exception e) {
+			KawaiServer.LOGGER.severe("PHPService got: " + e);
+			return null;
+		} finally {
+			if(phpProc != null) {
+				phpProc.destroyForcibly();
+			}
+		}
+
+		return new String(data);
+	}
+
 	// These below are methods handling
 	
 	public static void handleGETMethod(KawaiClient client, httpObject httpData) {
-		File requestPath = null;
+		File requestPath = new File(KawaiServer.rootDir.getPath() + httpData.requestPath);
 		String httpResponse = null;
 		httpObject createdHttp = new httpObject();
-		boolean isFile = false;
+		boolean useBody = true;
 		
 		createdHttp.type = httpParser.MessageType.HTTP_RESPONSE;
 		createdHttp.httpVersion = "HTTP/1.1";
 		createdHttp.addHeader("Server", "KawaiServer");
 		
-		// Default resource if the requested path is /
-		if(httpData.requestPath.equals("/")) {
-			requestPath = new File(KawaiServer.rootDir.getPath() + "/index.html");
-		} else {
-			requestPath = new File(KawaiServer.rootDir.getPath() + httpData.requestPath);
-		}
-
 		// If the requested resource is exists
 		if(requestPath.exists()) {
-			KawaiServer.LOGGER.info(httpData.requestPath + " is exists");
-			
+			String mimeType = null;
+
+			// If the requested resource is directory
+			if(requestPath.isDirectory()) {
+				List<String> listItem = Arrays.asList(requestPath.list());
+
+				if(listItem.contains("index.html")) {
+					requestPath = new File(requestPath.getPath() + "/index.html");
+					mimeType = Mime.mimeTypes.get("html");
+					
+					createdHttp.statusCode = 200;
+					createdHttp.statusDesc = "Found";
+					createdHttp.addHeader("Content-Type", mimeType);
+					createdHttp.addHeader("Content-Length", String.valueOf(requestPath.length()));
+
+					useBody = false;
+				}
+				else if(listItem.contains("index.php")) {
+					requestPath = new File(requestPath.getPath() + "/index.php");
+					String data = KawaiServer.PHPService(httpData, requestPath.getPath());
+					
+					createdHttp.statusCode = 200;
+					createdHttp.statusDesc = "Found";
+
+					if(data == null) {
+						mimeType = Mime.mimeTypes.get("php");
+						createdHttp.addHeader("Content-Length", String.valueOf(requestPath.length()));
+
+						useBody = false;
+					} else {
+						mimeType = Mime.mimeTypes.get("html");
+						createdHttp.body = data.getBytes();
+						createdHttp.addHeader("Content-Length", String.valueOf(createdHttp.body.length));
+					}
+					
+					createdHttp.addHeader("Content-Type", Mime.mimeTypes.get("html"));
+				}
+				else {
+					listItem = Arrays.asList(KawaiServer.rootDir.list());
+
+					if(listItem.contains("index.html")) {
+						requestPath = new File(KawaiServer.rootDir.getPath() + "/index.html");
+						mimeType = Mime.mimeTypes.get("html");
+						
+						createdHttp.statusCode = 200;
+						createdHttp.statusDesc = "Found";
+						createdHttp.addHeader("Content-Type", mimeType);
+						createdHttp.addHeader("Content-Length", String.valueOf(requestPath.length()));
+
+						useBody = false;
+					}
+					else if(listItem.contains("index.php")) {
+						requestPath = new File(KawaiServer.rootDir.getPath() + "/index.php");
+						String data = KawaiServer.PHPService(httpData, requestPath.getPath());
+						
+						createdHttp.statusCode = 200;
+						createdHttp.statusDesc = "Found";
+
+						if(data == null) {
+							mimeType = Mime.mimeTypes.get("php");
+							createdHttp.addHeader("Content-Length", String.valueOf(requestPath.length()));
+
+							useBody = false;
+						} else {
+							mimeType = Mime.mimeTypes.get("html");
+							createdHttp.body = data.getBytes();
+							createdHttp.addHeader("Content-Length", String.valueOf(createdHttp.body.length));
+						}
+						
+						createdHttp.addHeader("Content-Type", Mime.mimeTypes.get("html"));
+					}
+					else {
+						createdHttp.statusCode = 404;
+						createdHttp.statusDesc = "Not Found";
+					}
+				}
+			}
+
 			// If the requested resource is file
-			if(requestPath.isFile()) {
+			else if(requestPath.isFile()) {
+				mimeType = Mime.getMimeType(requestPath.getName());
+				String data = null;
+
+				if(mimeType == null) {
+					mimeType = Mime.mimeTypes.get("txt");
+					createdHttp.addHeader("Content-Length", String.valueOf(requestPath.length()));
+					
+					useBody = false;
+				}
+				else if(mimeType.compareTo(Mime.mimeTypes.get("php")) == 0) {
+					data = KawaiServer.PHPService(httpData, requestPath.getPath());
+
+					if(data != null) {
+						mimeType = Mime.mimeTypes.get("html");
+						createdHttp.body = data.getBytes();
+						createdHttp.addHeader("Content-Length", String.valueOf(createdHttp.body.length));
+					}
+					else {
+						createdHttp.addHeader("Content-Length", String.valueOf(requestPath.length()));
+					}
+				} 
+				else {
+					createdHttp.addHeader("Content-Length", String.valueOf(requestPath.length()));
+					
+					useBody = false;
+				}
+				
 				createdHttp.statusCode = 200;
 				createdHttp.statusDesc = "Found";
-				createdHttp.addHeader("Content-Length", String.valueOf(requestPath.length()));
-				createdHttp.addHeader("Content-Type", Mime.getMimeType(requestPath.getName()));
-				
-				isFile = true;
-			}
-			
-			// If the requested resource is directory
-			else if(requestPath.isDirectory()) {
-				createdHttp.statusCode = 400;
-				createdHttp.statusDesc = "You accessed a directory";
-				createdHttp.body = "<h1>Tried to access a directory?</h1>".getBytes();
-				createdHttp.addHeader("Content-Length", String.valueOf(createdHttp.body.length));
-				createdHttp.addHeader("Content-Type", Mime.mimeTypes.get("html"));
+				createdHttp.addHeader("Content-Type", mimeType);
 			}
 		} 
 		
@@ -276,7 +409,7 @@ public class KawaiServer {
 		try {
 			KawaiServer.sendData(client, httpResponse.getBytes());
 
-			if(isFile) {
+			if(!useBody) {
 				KawaiServer.sendFile(client, requestPath);
 			}
 		} catch(Exception e) {

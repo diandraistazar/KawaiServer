@@ -2,6 +2,8 @@ param (
     [Parameter(Mandatory = $true)][ValidateSet("compile", "clean")][string]$Cmd
 )
 
+# Script Configuration
+$Version="v1.0.0"
 $SourceFiles = [System.Collections.ArrayList]@(
 	"KawaiServer.java"
 )
@@ -10,7 +12,7 @@ $BuildDir = ".\build"
 $Name = "KawaiServer.jar"
 $EntryPoint = "KawaiServer" # KawaiServer.class as the entry point
 
-### These functions as helper
+### --[Helper functions]--
 
 function Get-CmdExistence() {
     param (
@@ -26,7 +28,13 @@ function Get-CmdExistence() {
     return $False
 }
 
-### Main script logic
+### --[Main logic of this script]--
+
+Write-Host -ForegroundColor White "### BUILD SCRIPT FOR WINDOWS ###"
+Write-Host -ForegroundColor White "## branch: $(git --no-pager branch --show-current)"
+Write-Host -ForegroundColor White "## name: $Name"
+Write-Host -ForegroundColor White "## ver: $Version"
+Write-Host
 
 if ($Cmd -eq "compile") {
     # Existence of javac, java, jar checking
@@ -35,12 +43,12 @@ if ($Cmd -eq "compile") {
         -not $(Get-CmdExistence("java.exe")) -or
         -not $(Get-CmdExistence("jar.exe"))
     ) {
-        Write-Host -ForegroundColor White -BackgroundColor Red "Please check is the java package installed"
+        Write-Host -ForegroundColor White -BackgroundColor Red "Is the java package installed?"
         exit 1
     }
 
 	if (Test-Path $BuildDir) {
-		Write-Host -ForegroundColor Yellow "$BuildDir directory is already exists. SKIP"
+		Write-Host -ForegroundColor Yellow "$BuildDir directory is already exists. Re-creating"
 	} else {
 		New-Item $BuildDir -ItemType Directory | Out-Null
 		Write-Host -ForegroundColor Yellow "New directory named $BuildDir created"
@@ -48,13 +56,13 @@ if ($Cmd -eq "compile") {
 
 	for ($i = 0; $i -lt $SourceFiles.Count; $i++) {
 		$SourceFile = $SourceFiles[$i]
-		$SrcFilePath = $SourceDir + "\" + $SourceFile
-		$DestFilePath = $BuildDir + "\" + $SourceFile
+		$SrcFilePath = "$SourceDir\$SourceFile"
+		$DestFilePath = "$BuildDir\$SourceFile"
 
 		if(-not $(Test-Path $SrcFilePath)) {
 			Write-Host -NoNewLine -ForegroundColor White "   $SrcFilePath -> $DestFilePath : "
-			Write-Host -ForegroundColor Red "not exists"
-			exit 1	
+			Write-Host -ForegroundColor Red "Not exists"
+			exit 1
 		}
 
 		if ($SrcFilePath.EndsWith(".java")) {
@@ -89,6 +97,7 @@ if ($Cmd -eq "compile") {
 		}
 	}
 	
+	Write-Host
 	Set-Location $BuildDir
 	jar -vcfe $Name $EntryPoint *
     if ($?) {
@@ -103,7 +112,7 @@ if ($Cmd -eq "compile") {
 	
 	Write-Host
 	Write-Host -ForegroundColor Yellow "Compilation successfully :3"
-	Write-Host -ForegroundColor White "try run ""java -jar KawaiServer.jar"""
+	Write-Host -ForegroundColor White "try run ""java -jar $Name"""
 } 
 
 elseif ($Cmd -eq "clean") {
@@ -124,6 +133,6 @@ elseif ($Cmd -eq "clean") {
 
 else {
     Write-Host -ForegroundColor Red "What the hell ""$($Cmd)"" command?"
-    Write-host -ForegroundColor White "There are only ""compile"" and ""clean"""
+    Write-host -ForegroundColor White "There are only ""compile"" and ""clean"" command"
     exit 1
 }
