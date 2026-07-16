@@ -1,7 +1,7 @@
 # Changelog
 Any changes to this project, will be documented here
 
-### 1.0.0 - 2026-07-14
+### 1.0.0 - 2026-07-16
 
 ### Added
 

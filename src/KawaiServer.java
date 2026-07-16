@@ -193,6 +193,8 @@ public class KawaiServer {
 
 		if(httpData.method.compareTo("GET") == 0) {
 			KawaiServer.handleGETMethod(client, httpData);
+		} else {
+			KawaiServer.LOGGER.severe("Requested method is unknown. SKIP");
 		}
 	}
 
